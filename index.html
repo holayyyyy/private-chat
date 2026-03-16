@@ -2,76 +2,178 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Чат Vitalik и Ciba</title>
+    <title>tdvtchat · супер-чат</title>
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- Для звуков -->
+    <audio id="notificationSound" preload="auto"></audio>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
         
-        body {
+        /* Светлая тема (по умолчанию) */
+        body.light-theme {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+        }
+        
+        body.light-theme .chat-container {
+            background: white;
+        }
+        
+        body.light-theme .messages-area {
+            background: #f5f6fa;
+        }
+        
+        /* Тёмная тема */
+        body.dark-theme {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        body.dark-theme .chat-container {
+            background: #0f3460;
+            color: white;
+        }
+        
+        body.dark-theme .messages-area {
+            background: #1a1a2e;
+        }
+        
+        body.dark-theme .message-content {
+            background: #0f3460;
+            color: white;
+            border-color: #4a4a4a;
+        }
+        
+        body.dark-theme .message-info {
+            color: #a0a0a0;
+        }
+        
+        body.dark-theme .input-area {
+            background: #16213e;
+            border-top-color: #0f3460;
+        }
+        
+        body.dark-theme input {
+            background: #0f3460;
+            color: white;
+            border-color: #4a4a4a;
         }
         
         .chat-container {
             width: 100%;
-            max-width: 800px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1100px;
+            border-radius: 30px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
             overflow: hidden;
+            transition: all 0.3s;
         }
         
         .header {
-            background: #4834d4;
+            background: linear-gradient(135deg, #4834d4, #3c2bb5);
             color: white;
-            padding: 20px;
+            padding: 15px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
-        .user-select {
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .room-name {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        
+        .header-actions {
             display: flex;
             gap: 10px;
         }
         
-        .user-btn {
-            padding: 8px 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            background: transparent;
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
             color: white;
-            border-radius: 20px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
             cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+        
+        .header-btn.active {
+            background: rgba(255,255,255,0.4);
+            box-shadow: 0 0 15px white;
+        }
+        
+        .users-panel {
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            border-radius: 40px;
+        }
+        
+        .user-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             font-size: 14px;
         }
         
-        .user-btn.active {
-            background: white;
-            color: #4834d4;
-            border-color: white;
+        .online-dot {
+            width: 10px;
+            height: 10px;
+            background: #4ade80;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4ade80;
+        }
+        
+        .offline-dot {
+            width: 10px;
+            height: 10px;
+            background: #94a3b8;
+            border-radius: 50%;
+        }
+        
+        .current-user {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-weight: 600;
         }
         
         .messages-area {
-            height: 400px;
+            height: 450px;
             overflow-y: auto;
-            padding: 20px;
-            background: #f5f6fa;
+            padding: 25px;
+            transition: background 0.3s;
         }
         
         .message {
-            margin-bottom: 15px;
-            max-width: 70%;
+            margin-bottom: 20px;
+            max-width: 75%;
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
         
         .my-message {
@@ -79,84 +181,398 @@
         }
         
         .message-content {
-            padding: 10px 15px;
-            border-radius: 18px;
+            padding: 12px 18px;
+            border-radius: 20px;
             background: white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             word-break: break-word;
+            line-height: 1.5;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s;
         }
         
         .my-message .message-content {
             background: #4834d4;
             color: white;
+            border: none;
+        }
+        
+        /* Теги */
+        .message-content .tag {
+            background: #e2e8f0;
+            color: #4834d4;
+            padding: 2px 8px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 2px;
+            cursor: pointer;
+        }
+        
+        .dark-theme .message-content .tag {
+            background: #4a4a4a;
+            color: #a0a0ff;
+        }
+        
+        /* Упоминания */
+        .mention {
+            background: #ffd700;
+            color: black;
+            padding: 2px 8px;
+            border-radius: 15px;
+            font-weight: 600;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { background: #ffd700; }
+            50% { background: #ffed4e; }
         }
         
         .message-info {
             font-size: 12px;
             color: #666;
-            margin-bottom: 4px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .my-message .message-info {
-            text-align: right;
+            justify-content: flex-end;
         }
+        
+        .message-sender {
+            font-weight: 700;
+        }
+        
+        .message-sender.vitalik { color: #3b82f6; }
+        .message-sender.ciba { color: #a855f7; }
+        .message-sender.yoker { color: #eab308; }
+        
+        .my-message .message-sender { color: white; }
         
         .message-time {
             font-size: 10px;
             color: #999;
-            margin-top: 4px;
+        }
+        
+        /* Реакции */
+        .message-reactions {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .reaction {
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .reaction:hover {
+            transform: scale(1.1);
+            background: #e2e8f0;
+        }
+        
+        .reaction.active {
+            background: #4834d4;
+            color: white;
+            border-color: #4834d4;
+        }
+        
+        .dark-theme .reaction {
+            background: #4a4a4a;
+            border-color: #666;
+            color: white;
+        }
+        
+        /* Ответы на сообщения */
+        .reply-info {
+            background: rgba(0,0,0,0.05);
+            padding: 5px 10px;
+            border-radius: 10px;
+            margin-bottom: 5px;
+            font-size: 12px;
+            border-left: 3px solid #4834d4;
+            cursor: pointer;
+        }
+        
+        .dark-theme .reply-info {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .reply-info:hover {
+            background: rgba(0,0,0,0.1);
+        }
+        
+        /* Избранные сообщения */
+        .favorite {
+            border-left: 4px solid #ffd700 !important;
+        }
+        
+        .favorite .message-content::before {
+            content: "⭐";
+            margin-right: 5px;
+        }
+        
+        /* Файлы */
+        .file-attachment {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-icon {
+            font-size: 24px;
+        }
+        
+        .file-name {
+            font-size: 13px;
+            word-break: break-all;
+        }
+        
+        .file-size {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .download-btn {
+            margin-left: auto;
+            background: #4834d4;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        
+        .image-attachment {
+            max-width: 250px;
+            border-radius: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        
+        /* Индикатор "прочитано" */
+        .read-status {
+            font-size: 12px;
+            color: #999;
+            margin-top: 2px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 2px;
+        }
+        
+        .read-status .check {
+            opacity: 0.5;
+        }
+        
+        .read-status .check.read {
+            opacity: 1;
+            color: #4ade80;
         }
         
         .input-area {
             padding: 20px;
             background: white;
-            border-top: 1px solid #eee;
+            border-top: 2px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+        
+        .input-wrapper {
             display: flex;
             gap: 10px;
         }
         
-        input {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 25px;
-            outline: none;
-            font-size: 14px;
+        .reply-preview {
+            background: #f1f5f9;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        button {
+        .cancel-reply {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 30px;
+            outline: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            border-color: #4834d4;
+        }
+        
+        .action-btn {
             background: #4834d4;
             color: white;
             border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 20px;
+            transition: all 0.3s;
         }
         
-        button:hover {
-            background: #3c2bb5;
+        .action-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .attach-btn {
+            background: #f1f5f9;
+            color: #4834d4;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .dark-theme .attach-btn {
+            background: #4a4a4a;
+            color: white;
+        }
+        
+        .typing-indicator {
+            padding: 10px 25px;
+            color: #666;
+            font-size: 13px;
+            font-style: italic;
+            background: #f1f5f9;
         }
         
         .hidden {
             display: none;
         }
         
-        .welcome-screen {
-            text-align: center;
-            padding: 40px;
+        /* Экран входа */
+        .login-container {
             background: white;
-            border-radius: 20px;
+            border-radius: 40px;
+            padding: 50px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
         }
         
-        .welcome-screen h1 {
+        .login-title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #3b82f6, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 30px;
             margin-bottom: 20px;
-            color: #333;
+            text-align: center;
         }
         
-        .welcome-screen button {
-            margin: 10px;
-            width: 150px;
+        .login-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #3b82f6, #a855f7);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .user-card {
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .user-card:hover {
+            border-color: #4834d4;
+            transform: translateY(-5px);
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .vitalik .user-avatar { background: #3b82f6; }
+        .ciba .user-avatar { background: #a855f7; }
+        .yoker .user-avatar { background: #eab308; }
+        
+        /* Вкладки */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            padding: 10px 25px;
+            background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .tab {
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            background: #4834d4;
+            color: white;
+        }
+        
+        .dark-theme .tabs {
+            background: #0f3460;
         }
     </style>
 </head>
@@ -164,7 +580,7 @@
     <div id="app"></div>
 
     <script>
-        // !!! ТВОИ ДАННЫЕ ИЗ FIREBASE !!!
+        // ТВОИ ДАННЫЕ ИЗ FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyCwwFF6s91vt2C6fK-kHT0Cl5B9ziPuWLI",
             authDomain: "tdvdchat.firebaseapp.com",
@@ -172,119 +588,402 @@
             projectId: "tdvdchat",
             storageBucket: "tdvdchat.firebasestorage.app",
             messagingSenderId: "760809424572",
-            appId: "1:760809424572:web:22c18a87e756fe168832b9",
-            measurementId: "G-YSV9B1W5R3"
+            appId: "1:760809424572:web:22c18a87e756fe168832b9"
         };
 
-        // Запускаем Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const storage = firebase.storage?.();
 
-        // Основной класс чата
-        class Chat {
+        const CHAT_PASSWORD = "tdvt2026";
+        
+        const USERS = [
+            { id: 'vitalik', name: 'Vitalik', color: '#3b82f6', avatar: 'V' },
+            { id: 'ciba', name: 'Ciba', color: '#a855f7', avatar: 'C' },
+            { id: 'yoker', name: 'Yoker', color: '#eab308', avatar: 'Y' }
+        ];
+
+        class SuperChat {
             constructor() {
                 this.currentUser = null;
+                this.isAuthenticated = false;
+                this.typingTimeout = null;
+                this.replyingTo = null; // Для ответов
+                this.darkMode = localStorage.getItem('darkMode') === 'true';
+                this.dndMode = false; // Не беспокоить
+                this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+                this.soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
+                this.currentTab = 'all'; // all, favorites, tags
+                
+                if (this.darkMode) {
+                    document.body.classList.add('dark-theme');
+                }
+                
                 this.init();
             }
 
             init() {
-                // Проверяем, есть ли сохраненный пользователь
-                const savedUser = localStorage.getItem('chat_user');
+                const savedSession = localStorage.getItem('tdvtchat_session');
                 
-                if (savedUser === 'vitalik' || savedUser === 'ciba') {
-                    // Если есть - входим сразу
-                    this.login(savedUser);
+                if (savedSession === 'authenticated') {
+                    this.showUserSelect();
                 } else {
-                    // Если нет - показываем экран входа
                     this.showLoginScreen();
                 }
             }
 
+            // ========== ВХОД ==========
             showLoginScreen() {
                 document.getElementById('app').innerHTML = `
-                    <div class="welcome-screen">
-                        <h1>🔐 Приватный чат</h1>
-                        <p>Выбери, кто ты:</p>
-                        <div style="margin-top: 30px;">
-                            <button onclick="chat.login('vitalik')">Я Vitalik</button>
-                            <button onclick="chat.login('ciba')">Я Ciba</button>
+                    <div class="login-container">
+                        <div class="login-title">tdvtchat</div>
+                        <input type="password" class="password-input" id="passwordInput" 
+                               placeholder="Пароль" maxlength="8" 
+                               onkeypress="if(event.key === 'Enter') chat.checkPassword()">
+                        <button class="login-btn" onclick="chat.checkPassword()">Войти</button>
+                    </div>
+                `;
+            }
+
+            checkPassword() {
+                const input = document.getElementById('passwordInput');
+                if (input.value === CHAT_PASSWORD) {
+                    this.isAuthenticated = true;
+                    localStorage.setItem('tdvtchat_session', 'authenticated');
+                    this.showUserSelect();
+                } else {
+                    alert('Неверный пароль');
+                }
+            }
+
+            showUserSelect() {
+                document.getElementById('app').innerHTML = `
+                    <div class="login-container">
+                        <div class="login-title">Кто ты?</div>
+                        <div class="users-grid">
+                            ${USERS.map(user => `
+                                <div class="user-card ${user.id}" onclick="chat.login('${user.id}')">
+                                    <div class="user-avatar">${user.avatar}</div>
+                                    <div>${user.name}</div>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
                 `;
             }
 
-            login(user) {
-                this.currentUser = user;
-                localStorage.setItem('chat_user', user);
+            login(userId) {
+                this.currentUser = userId;
+                localStorage.setItem('tdvtchat_user', userId);
                 
-                // Сохраняем в Firebase, что пользователь онлайн
-                db.ref('users/' + user).set({
+                db.ref('users/' + userId).set({
                     online: true,
-                    lastSeen: Date.now()
+                    lastSeen: Date.now(),
+                    dnd: this.dndMode
                 });
                 
-                // Показываем чат
                 this.showChat();
-                
-                // Начинаем слушать сообщения
                 this.listenMessages();
+                this.listenUsersStatus();
+                this.listenTyping();
                 
-                // Обновляем статус онлайн каждые 5 секунд
                 setInterval(() => {
-                    db.ref('users/' + user).update({
-                        online: true,
-                        lastSeen: Date.now()
-                    });
+                    if (this.currentUser) {
+                        db.ref('users/' + this.currentUser).update({
+                            online: true,
+                            lastSeen: Date.now(),
+                            dnd: this.dndMode
+                        });
+                    }
                 }, 5000);
             }
 
+            // ========== ЧАТ ==========
             showChat() {
-                const isVitalik = this.currentUser === 'vitalik';
+                const currentUserData = USERS.find(u => u.id === this.currentUser);
                 
                 document.getElementById('app').innerHTML = `
                     <div class="chat-container">
                         <div class="header">
-                            <div>
-                                <span style="font-weight: bold;">💬 Чат Vitalik & Ciba</span>
+                            <div class="room-info">
+                                <span class="room-name">tdvtchat</span>
                             </div>
-                            <div class="user-select">
-                                <span class="user-btn ${isVitalik ? 'active' : ''}">Vitalik</span>
-                                <span class="user-btn ${!isVitalik ? 'active' : ''}">Ciba</span>
+                            <div class="header-actions">
+                                <button class="header-btn" onclick="chat.toggleTheme()" title="Сменить тему">
+                                    ${this.darkMode ? '☀️' : '🌙'}
+                                </button>
+                                <button class="header-btn ${this.soundEnabled ? 'active' : ''}" 
+                                        onclick="chat.toggleSound()" title="Звуки">
+                                    ${this.soundEnabled ? '🔊' : '🔇'}
+                                </button>
+                                <button class="header-btn ${this.dndMode ? 'active' : ''}" 
+                                        onclick="chat.toggleDND()" title="Не беспокоить">
+                                    🔕
+                                </button>
+                                <button class="header-btn" onclick="chat.showFavorites()" title="Избранное">
+                                    ⭐
+                                </button>
                             </div>
+                            <div class="current-user">
+                                👤 ${currentUserData.name}
+                            </div>
+                            <div class="users-panel" id="usersStatus">
+                                ${USERS.map(user => `
+                                    <div class="user-status" id="status-${user.id}">
+                                        <span class="offline-dot" id="dot-${user.id}"></span>
+                                        <span>${user.name}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="tabs">
+                            <div class="tab ${this.currentTab === 'all' ? 'active' : ''}" 
+                                 onclick="chat.switchTab('all')">Все сообщения</div>
+                            <div class="tab ${this.currentTab === 'favorites' ? 'active' : ''}" 
+                                 onclick="chat.switchTab('favorites')">⭐ Избранное</div>
+                            <div class="tab ${this.currentTab === 'tags' ? 'active' : ''}" 
+                                 onclick="chat.switchTab('tags')">🏷️ Теги</div>
                         </div>
                         
                         <div class="messages-area" id="messages"></div>
                         
+                        <div class="typing-indicator hidden" id="typingIndicator">
+                            ✏️ Кто-то печатает...
+                        </div>
+                        
+                        <div class="reply-preview hidden" id="replyPreview">
+                            <span id="replyText"></span>
+                            <button class="cancel-reply" onclick="chat.cancelReply()">✕</button>
+                        </div>
+                        
                         <div class="input-area">
-                            <input type="text" id="messageInput" placeholder="Введите сообщение..." 
-                                   onkeypress="if(event.key === 'Enter') chat.sendMessage()">
-                            <button onclick="chat.sendMessage()">Отправить</button>
+                            <div class="input-wrapper">
+                                <button class="attach-btn" onclick="chat.attachFile()" title="Прикрепить файл">📎</button>
+                                <input type="text" id="messageInput" 
+                                       placeholder="Сообщение... (используй #теги и @упоминания)" 
+                                       onkeypress="if(event.key === 'Enter') chat.sendMessage()"
+                                       oninput="chat.startTyping()">
+                                <button class="action-btn" onclick="chat.sendMessage()">➤</button>
+                            </div>
                         </div>
                     </div>
                 `;
                 
-                // Загружаем старые сообщения
                 this.loadMessages();
             }
 
-            loadMessages() {
-                db.ref('messages').once('value', (snapshot) => {
-                    const messages = snapshot.val() || {};
-                    // Преобразуем объект в массив и сортируем по времени
-                    const messagesArray = Object.values(messages).sort((a, b) => a.time - b.time);
-                    messagesArray.forEach(msg => {
-                        this.displayMessage(msg);
+            // ========== ФУНКЦИИ ==========
+            
+            // 2. Тема оформления
+            toggleTheme() {
+                this.darkMode = !this.darkMode;
+                localStorage.setItem('darkMode', this.darkMode);
+                
+                if (this.darkMode) {
+                    document.body.classList.add('dark-theme');
+                } else {
+                    document.body.classList.remove('dark-theme');
+                }
+                
+                this.showChat(); // Перерисовываем чат
+            }
+
+            // 3. Звуки
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                localStorage.setItem('soundEnabled', this.soundEnabled);
+                this.showChat();
+            }
+
+            playSound(type = 'message') {
+                if (!this.soundEnabled || this.dndMode) return;
+                
+                // Простой звук через Web Audio API
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = type === 'message' ? 800 : 600;
+                gainNode.gain.value = 0.1;
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            }
+
+            // 4. Отправка файлов
+            attachFile() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,.pdf,.doc,.docx,.txt';
+                
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('Файл слишком большой (макс 10MB)');
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    
+                    if (file.type.startsWith('image/')) {
+                        reader.onload = (e) => {
+                            this.sendMessage(null, {
+                                type: 'image',
+                                data: e.target.result,
+                                name: file.name
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        reader.onload = (e) => {
+                            this.sendMessage(null, {
+                                type: 'file',
+                                data: e.target.result,
+                                name: file.name,
+                                size: file.size
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+                
+                input.click();
+            }
+
+            // 5. Ответы на сообщения
+            setReply(messageId, messageText, messageSender) {
+                this.replyingTo = { id: messageId, text: messageText, sender: messageSender };
+                
+                const preview = document.getElementById('replyPreview');
+                const replyText = document.getElementById('replyText');
+                
+                if (preview && replyText) {
+                    preview.classList.remove('hidden');
+                    replyText.textContent = `Ответ ${messageSender}: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`;
+                }
+            }
+
+            cancelReply() {
+                this.replyingTo = null;
+                const preview = document.getElementById('replyPreview');
+                if (preview) {
+                    preview.classList.add('hidden');
+                }
+            }
+
+            // 8. Прочитано
+            markAsRead(messageId) {
+                if (!this.currentUser) return;
+                
+                db.ref('messages/' + messageId + '/readBy/' + this.currentUser).set(true);
+            }
+
+            // 11. Избранное
+            toggleFavorite(messageId) {
+                const index = this.favorites.indexOf(messageId);
+                
+                if (index === -1) {
+                    this.favorites.push(messageId);
+                } else {
+                    this.favorites.splice(index, 1);
+                }
+                
+                localStorage.setItem('favorites', JSON.stringify(this.favorites));
+                this.showChat(); // Обновляем
+            }
+
+            showFavorites() {
+                this.currentTab = 'favorites';
+                this.showChat();
+            }
+
+            // 13. Не беспокоить
+            toggleDND() {
+                this.dndMode = !this.dndMode;
+                
+                if (this.currentUser) {
+                    db.ref('users/' + this.currentUser).update({
+                        dnd: this.dndMode
                     });
+                }
+                
+                this.showChat();
+            }
+
+            // 15. Теги
+            extractTags(text) {
+                const tags = text.match(/#[a-zA-Zа-яА-Я0-9_]+/g) || [];
+                return tags.map(tag => tag.substring(1));
+            }
+
+            // Эмодзи-реакции
+            addReaction(messageId, emoji) {
+                const reactionPath = `messages/${messageId}/reactions/${emoji}`;
+                
+                db.ref(reactionPath).transaction((count) => {
+                    return (count || 0) + 1;
                 });
             }
 
-            listenMessages() {
-                db.ref('messages').on('child_added', (snapshot) => {
-                    const msg = snapshot.val();
-                    // Проверяем, нет ли уже такого сообщения
-                    const messagesDiv = document.getElementById('messages');
-                    if (messagesDiv) {
-                        this.displayMessage(msg);
+            // Упоминания
+            extractMentions(text) {
+                const mentions = text.match(/@[a-zA-Zа-яА-Я0-9_]+/g) || [];
+                return mentions.map(mention => mention.substring(1).toLowerCase());
+            }
+
+            // ========== СООБЩЕНИЯ ==========
+            sendMessage(text = null, file = null) {
+                const input = document.getElementById('messageInput');
+                const messageText = text || input.value.trim();
+                
+                if (!messageText && !file) return;
+                
+                const message = {
+                    sender: this.currentUser,
+                    text: messageText || '',
+                    time: Date.now(),
+                    replyTo: this.replyingTo,
+                    readBy: {},
+                    reactions: {}
+                };
+                
+                // Добавляем файл если есть
+                if (file) {
+                    message.file = file;
+                }
+                
+                // Извлекаем теги
+                if (messageText) {
+                    message.tags = this.extractTags(messageText);
+                    
+                    // Проверяем упоминания
+                    const mentions = this.extractMentions(messageText);
+                    if (mentions.length > 0) {
+                        message.mentions = mentions;
+                        
+                        // Уведомление для упомянутых
+                        mentions.forEach(mention => {
+                            const user = USERS.find(u => u.name.toLowerCase() === mention);
+                            if (user && user.id !== this.currentUser) {
+                                this.playSound('mention');
+                            }
+                        });
+                    }
+                }
+                
+                db.ref('messages').push(message).then(() => {
+                    if (!file) input.value = '';
+                    this.cancelReply();
+                    
+                    if (!this.dndMode) {
+                        this.playSound('message');
                     }
                 });
             }
@@ -293,39 +992,246 @@
                 const messagesDiv = document.getElementById('messages');
                 if (!messagesDiv) return;
                 
+                // Фильтр по вкладкам
+                if (this.currentTab === 'favorites' && !this.favorites.includes(msg.id)) {
+                    return;
+                }
+                
+                if (this.currentTab === 'tags' && (!msg.tags || msg.tags.length === 0)) {
+                    return;
+                }
+                
                 const isMyMessage = msg.sender === this.currentUser;
-                const senderName = msg.sender === 'vitalik' ? 'Vitalik' : 'Ciba';
+                const sender = USERS.find(u => u.id === msg.sender);
                 const time = new Date(msg.time).toLocaleTimeString();
                 
                 const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${isMyMessage ? 'my-message' : ''}`;
+                messageDiv.className = `message ${isMyMessage ? 'my-message' : ''} ${this.favorites.includes(msg.id) ? 'favorite' : ''}`;
+                messageDiv.id = `msg-${msg.id}`;
+                messageDiv.onclick = () => this.markAsRead(msg.id);
+                
+                let fileHtml = '';
+                if (msg.file) {
+                    if (msg.file.type === 'image') {
+                        fileHtml = `<img src="${msg.file.data}" class="image-attachment" onclick="window.open('${msg.file.data}')">`;
+                    } else {
+                        fileHtml = `
+                            <div class="file-attachment">
+                                <span class="file-icon">📎</span>
+                                <div>
+                                    <div class="file-name">${msg.file.name}</div>
+                                    <div class="file-size">${Math.round(msg.file.size / 1024)} KB</div>
+                                </div>
+                                <button class="download-btn" onclick="chat.downloadFile('${msg.file.data}', '${msg.file.name}')">📥</button>
+                            </div>
+                        `;
+                    }
+                }
+                
+                let replyHtml = '';
+                if (msg.replyTo) {
+                    replyHtml = `
+                        <div class="reply-info" onclick="document.getElementById('msg-${msg.replyTo.id}')?.scrollIntoView({behavior: 'smooth'})">
+                            ↪ Ответ для ${msg.replyTo.sender}: ${msg.replyTo.text.substring(0, 30)}...
+                        </div>
+                    `;
+                }
+                
+                // Обработка текста (теги и упоминания)
+                let processedText = msg.text;
+                if (msg.tags) {
+                    msg.tags.forEach(tag => {
+                        processedText = processedText.replace(
+                            new RegExp(`#${tag}`, 'g'), 
+                            `<span class="tag" onclick="chat.filterByTag('${tag}')">#${tag}</span>`
+                        );
+                    });
+                }
+                
+                if (msg.mentions) {
+                    msg.mentions.forEach(mention => {
+                        if (mention === this.currentUser) {
+                            processedText = processedText.replace(
+                                new RegExp(`@${mention}`, 'gi'), 
+                                `<span class="mention">@${mention}</span>`
+                            );
+                        }
+                    });
+                }
+                
+                // Реакции
+                let reactionsHtml = '';
+                if (msg.reactions) {
+                    reactionsHtml = '<div class="message-reactions">';
+                    for (const [emoji, count] of Object.entries(msg.reactions)) {
+                        reactionsHtml += `
+                            <span class="reaction" onclick="chat.addReaction('${msg.id}', '${emoji}')">
+                                ${emoji} ${count}
+                            </span>
+                        `;
+                    }
+                    reactionsHtml += `
+                            <span class="reaction" onclick="chat.showReactionPicker('${msg.id}')">➕</span>
+                        </div>`;
+                }
+                
+                // Статус прочтения
+                let readStatus = '';
+                if (isMyMessage) {
+                    const readCount = Object.keys(msg.readBy || {}).length;
+                    readStatus = `
+                        <div class="read-status">
+                            ${readCount > 0 ? '✓✓' : '✓'}
+                        </div>
+                    `;
+                }
+                
                 messageDiv.innerHTML = `
-                    <div class="message-info">${senderName}</div>
-                    <div class="message-content">${msg.text}</div>
-                    <div class="message-time">${time}</div>
+                    <div class="message-info">
+                        <span class="message-sender ${msg.sender}">${sender ? sender.name : msg.sender}</span>
+                        <span class="message-time">${time}</span>
+                        <span class="reaction" onclick="chat.toggleFavorite('${msg.id}')">
+                            ${this.favorites.includes(msg.id) ? '⭐' : '☆'}
+                        </span>
+                    </div>
+                    ${replyHtml}
+                    <div class="message-content" ondblclick="chat.addReaction('${msg.id}', '❤️')">
+                        ${processedText}
+                        ${fileHtml}
+                    </div>
+                    ${reactionsHtml}
+                    ${readStatus}
                 `;
                 
                 messagesDiv.appendChild(messageDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                
+                // Отмечаем как прочитанное если не свое
+                if (!isMyMessage && !this.dndMode) {
+                    this.markAsRead(msg.id);
+                }
             }
 
-            sendMessage() {
-                const input = document.getElementById('messageInput');
-                const text = input.value.trim();
+            // Вспомогательные функции
+            downloadFile(data, filename) {
+                const a = document.createElement('a');
+                a.href = data;
+                a.download = filename;
+                a.click();
+            }
+
+            showReactionPicker(messageId) {
+                const emojis = ['❤️', '👍', '😂', '😮', '😢', '😡', '🎉', '🔥'];
+                const picker = document.createElement('div');
+                picker.style.position = 'fixed';
+                picker.style.background = 'white';
+                picker.style.padding = '10px';
+                picker.style.borderRadius = '10px';
+                picker.style.boxShadow = '0 5px 20px black';
+                picker.style.display = 'grid';
+                picker.style.gridTemplateColumns = 'repeat(4, 40px)';
+                picker.style.gap = '5px';
+                picker.style.zIndex = '1000';
                 
-                if (text && this.currentUser) {
-                    db.ref('messages').push({
-                        sender: this.currentUser,
-                        text: text,
-                        time: Date.now()
+                emojis.forEach(emoji => {
+                    const btn = document.createElement('span');
+                    btn.style.fontSize = '24px';
+                    btn.style.cursor = 'pointer';
+                    btn.style.textAlign = 'center';
+                    btn.style.padding = '5px';
+                    btn.textContent = emoji;
+                    btn.onclick = () => {
+                        this.addReaction(messageId, emoji);
+                        document.body.removeChild(picker);
+                    };
+                    picker.appendChild(btn);
+                });
+                
+                document.body.appendChild(picker);
+                
+                // Позиционируем у курсора
+                document.onmousemove = (e) => {
+                    picker.style.left = e.pageX + 'px';
+                    picker.style.top = (e.pageY - 100) + 'px';
+                    document.onmousemove = null;
+                };
+            }
+
+            filterByTag(tag) {
+                this.currentTab = 'tags';
+                this.showChat();
+                // TODO: фильтрация по тегу
+            }
+
+            switchTab(tab) {
+                this.currentTab = tab;
+                this.showChat();
+            }
+
+            // ========== СЛУШАТЕЛИ ==========
+            loadMessages() {
+                db.ref('messages').once('value', (snapshot) => {
+                    const messages = snapshot.val() || {};
+                    Object.values(messages).forEach(msg => this.displayMessage(msg));
+                });
+            }
+
+            listenMessages() {
+                db.ref('messages').on('child_added', (snapshot) => {
+                    const msg = snapshot.val();
+                    msg.id = snapshot.key;
+                    this.displayMessage(msg);
+                });
+            }
+
+            listenUsersStatus() {
+                USERS.forEach(user => {
+                    db.ref('users/' + user.id).on('value', (snapshot) => {
+                        const userData = snapshot.val();
+                        const dot = document.getElementById(`dot-${user.id}`);
+                        if (dot && userData) {
+                            const isOnline = Date.now() - userData.lastSeen < 15000;
+                            dot.className = isOnline ? 'online-dot' : 'offline-dot';
+                        }
                     });
-                    input.value = '';
+                });
+            }
+
+            listenTyping() {
+                db.ref('typing').on('value', (snapshot) => {
+                    const typing = snapshot.val() || {};
+                    const indicator = document.getElementById('typingIndicator');
+                    
+                    let someoneTyping = false;
+                    USERS.forEach(user => {
+                        if (typing[user.id] && user.id !== this.currentUser) {
+                            someoneTyping = true;
+                        }
+                    });
+                    
+                    if (indicator) {
+                        if (someoneTyping) {
+                            indicator.classList.remove('hidden');
+                        } else {
+                            indicator.classList.add('hidden');
+                        }
+                    }
+                });
+            }
+
+            startTyping() {
+                if (this.currentUser) {
+                    db.ref('typing/' + this.currentUser).set(true);
+                    
+                    clearTimeout(this.typingTimeout);
+                    this.typingTimeout = setTimeout(() => {
+                        db.ref('typing/' + this.currentUser).set(false);
+                    }, 2000);
                 }
             }
         }
 
-        // Создаем глобальный объект чата
-        const chat = new Chat();
+        const chat = new SuperChat();
         window.chat = chat;
     </script>
 </body>
