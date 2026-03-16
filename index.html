@@ -1,142 +1,856 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Чат для Vitalik и Ciba</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial; }
-        body { background: #667eea; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .chat { width: 600px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-        .header { background: #4834d4; color: white; padding: 20px; display: flex; justify-content: space-between; }
-        .user { background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; }
-        .messages { height: 400px; overflow-y: auto; padding: 20px; background: #f5f6fa; }
-        .message { margin-bottom: 15px; max-width: 80%; }
-        .my-message { margin-left: auto; }
-        .my-message .bubble { background: #4834d4; color: white; }
-        .friend-message .bubble { background: white; }
-        .bubble { padding: 10px 15px; border-radius: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: inline-block; }
-        .name { font-size: 12px; color: #666; margin-bottom: 3px; }
-        .time { font-size: 10px; color: #999; margin-top: 3px; }
-        .input-area { padding: 20px; background: white; display: flex; gap: 10px; }
-        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; }
-        button { background: #4834d4; color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer; }
-        .login { text-align: center; padding: 40px; background: white; border-radius: 20px; }
-        .login h2 { margin-bottom: 20px; }
-        .login button { margin: 10px; width: 120px; }
-    </style>
-    
-    <!-- Firebase -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vitalik · Ciba · приватный чат</title>
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- FingerprintJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .access-denied {
+            background: rgba(239, 68, 68, 0.1);
+            border: 2px solid #ef4444;
+            border-radius: 32px;
+            padding: 40px;
+            text-align: center;
+            color: white;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+        }
+
+        .access-denied h1 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            color: #ef4444;
+        }
+
+        .access-denied p {
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            height: 85vh;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Хедер */
+        .chat-header {
+            padding: 20px 24px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .room-name {
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .room-badge {
+            background: rgba(96, 165, 250, 0.2);
+            border: 1px solid #60a5fa;
+            color: #60a5fa;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .users-status {
+            display: flex;
+            gap: 16px;
+        }
+
+        .user-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            font-size: 14px;
+        }
+
+        .user-status.vitalik .user-dot { background: #3b82f6; box-shadow: 0 0 12px #3b82f6; }
+        .user-status.ciba .user-dot { background: #a855f7; box-shadow: 0 0 12px #a855f7; }
+
+        .user-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .user-dot.online {
+            animation: pulse 2s infinite;
+        }
+
+        .user-dot.offline {
+            background: #475569 !important;
+            box-shadow: none !important;
+            animation: none;
+        }
+
+        .user-name {
+            color: #e2e8f0;
+            font-weight: 500;
+        }
+
+        /* Сообщения */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 80%;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.vitalik {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .message.vitalik .message-avatar {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .message.ciba .message-avatar {
+            background: linear-gradient(135deg, #a855f7, #9333ea);
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .message.vitalik .message-sender { color: #93c5fd; }
+        .message.ciba .message-sender { color: #d8b4fe; }
+
+        .message-time {
+            color: #64748b;
+            font-size: 11px;
+        }
+
+        .message-bubble {
+            background: rgba(51, 65, 85, 0.8);
+            padding: 12px 16px;
+            border-radius: 20px 20px 20px 4px;
+            color: #f1f5f9;
+            line-height: 1.5;
+            word-break: break-word;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .message.vitalik .message-bubble {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-radius: 20px 20px 4px 20px;
+        }
+
+        .message-image {
+            max-width: 250px;
+            border-radius: 12px;
+            margin-top: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .message-image:hover {
+            transform: scale(1.05);
+        }
+
+        /* Системные сообщения */
+        .system-message {
+            text-align: center;
+            margin: 8px 0;
+        }
+
+        .system-text {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 16px;
+            border-radius: 30px;
+            color: #94a3b8;
+            font-size: 12px;
+            display: inline-block;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Индикатор печатания */
+        .typing-indicator {
+            padding: 12px 24px;
+            color: #94a3b8;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .typing-indicator.hidden {
+            display: none;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: #60a5fa;
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Поле ввода */
+        .input-area {
+            padding: 20px 24px;
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 4px 4px 4px 20px;
+        }
+
+        .message-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 14px 0;
+            color: #f1f5f9;
+            font-size: 15px;
+            outline: none;
+            resize: none;
+            max-height: 120px;
+            line-height: 1.5;
+            font-family: inherit;
+        }
+
+        .message-input::placeholder {
+            color: #475569;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+        }
+
+        .action-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #60a5fa;
+            transform: scale(1.1);
+        }
+
+        .action-btn.send {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .action-btn.send:hover {
+            transform: scale(1.1) rotate(90deg);
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        /* Эмодзи-пикер */
+        .emoji-picker {
+            position: absolute;
+            bottom: 100px;
+            right: 50px;
+            background: #1e293b;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            padding: 16px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 300px;
+        }
+
+        .emoji-picker.hidden {
+            display: none;
+        }
+
+        .emoji-item {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.2s;
+            font-size: 24px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .emoji-item:hover {
+            background: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        /* Модальное окно */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes typingBounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <div class="login">
-            <h2>🔐 Кто ты?</h2>
-            <button onclick="selectUser('vitalik')">Я Vitalik</button>
-            <button onclick="selectUser('ciba')">Я Ciba</button>
-        </div>
-    </div>
+    <div id="app"></div>
 
     <script>
-        // !!! ВСТАВЬ СВОИ ДАННЫЕ ИЗ FIREBASE !!!
-       const firebaseConfig = {
-          apiKey: "AIzaSyCwwFF6s91vt2C6fK-kHT0Cl5B9ziPuWLI",
-          authDomain: "tdvdchat.firebaseapp.com",
-          databaseURL: "https://tdvdchat-default-rtdb.europe-west1.firebasedatabase.app",
-          projectId: "tdvdchat",
-          storageBucket: "tdvdchat.firebasestorage.app",
-          messagingSenderId: "760809424572",
-          appId: "1:760809424572:web:22c18a87e756fe168832b9",
-          measurementId: "G-YSV9B1W5R3"
-};
+        // Конфигурация Firebase (бесплатный тариф)
+        const firebaseConfig = {
+             apiKey: "AIzaSyCwwFF6s91vt2C6fK-kHT0Cl5B9ziPuWLI",
+            authDomain: "tdvdchat.firebaseapp.com",
+             databaseURL: "https://tdvdchat-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "tdvdchat",
+            storageBucket: "tdvdchat.firebasestorage.app",
+             messagingSenderId: "760809424572",
+             appId: "1:760809424572:web:22c18a87e756fe168832b9",
+              measurementId: "G-YSV9B1W5R3"
+            };
 
-        };
 
-        // Запускаем Firebase
+        // Инициализация Firebase
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        
-        let currentUser = null;
+        const database = firebase.database();
 
-        // Функция выбора пользователя
-        window.selectUser = function(user) {
-            currentUser = user;
-            localStorage.setItem('chat_user', user);
-            showChat();
-            initChat();
-        };
-
-        // Показать чат
-        function showChat() {
-            const isVitalik = currentUser === 'vitalik';
-            document.getElementById('app').innerHTML = `
-                <div class="chat">
-                    <div class="header">
-                        <span>💬 Чат Vitalik & Ciba</span>
-                        <span class="user">${isVitalik ? '👤 Vitalik' : '👤 Ciba'}</span>
-                    </div>
-                    <div class="messages" id="messages"></div>
-                    <div class="input-area">
-                        <input type="text" id="messageInput" placeholder="Напиши сообщение..." 
-                               onkeypress="if(event.key==='Enter') sendMessage()">
-                        <button onclick="sendMessage()">→</button>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Отправка сообщения
-        window.sendMessage = function() {
-            const input = document.getElementById('messageInput');
-            const text = input.value.trim();
-            
-            if (text && currentUser) {
-                db.ref('messages').push({
-                    sender: currentUser,
-                    text: text,
-                    time: Date.now()
-                });
-                input.value = '';
+        class PrivateChat {
+            constructor() {
+                this.ALLOWED_FINGERPRINTS = {
+                    'vitalik': '740a8744cb661ce4ae950d2b51f10c99', // Это заменится реальными отпечатками
+                    'ciba': '2f526bc2eaa8a58e1f2c69bf46257f1f'
+                };
+                
+                this.currentUser = null;
+                this.userFingerprint = null;
+                this.emojiList = ['😊', '😂', '❤️', '👍', '🔥', '✨', '🎉', '👋', '🤝', '💪', '🤔', '😎', '🥳', '💯', '🔒', '🤫'];
+                
+                this.init();
             }
-        };
 
-        // Слушаем сообщения
-        function initChat() {
-            db.ref('messages').on('child_added', (data) => {
-                const msg = data.val();
-                const messagesDiv = document.getElementById('messages');
-                if (!messagesDiv) return;
+            async init() {
+                await this.identifyUser();
+                this.setupEventListeners();
+                this.setupEmojiPicker();
+                this.listenToMessages();
+                this.listenToUsersStatus();
+                this.updateUserStatus(true);
                 
-                const time = new Date(msg.time).toLocaleTimeString();
-                const isMyMessage = msg.sender === currentUser;
-                
-                messagesDiv.innerHTML += `
-                    <div class="message ${isMyMessage ? 'my-message' : 'friend-message'}">
-                        <div class="name">${msg.sender === 'vitalik' ? 'Vitalik' : 'Ciba'}</div>
-                        <div class="bubble">${msg.text}</div>
-                        <div class="time">${time}</div>
+                // При закрытии вкладки
+                window.addEventListener('beforeunload', () => {
+                    this.updateUserStatus(false);
+                });
+            }
+
+            async identifyUser() {
+                try {
+                    // Получаем отпечаток браузера
+                    const fp = await FingerprintJS.load();
+                    const result = await fp.get();
+                    this.userFingerprint = result.visitorId;
+                    
+                    console.log('Your fingerprint:', this.userFingerprint);
+                    
+                    // Проверяем, есть ли сохранённая идентификация
+                    const savedUser = localStorage.getItem('chat_user');
+                    
+                    if (savedUser === 'vitalik' || savedUser === 'ciba') {
+                        this.currentUser = savedUser;
+                        this.renderChat();
+                        return;
+                    }
+                    
+                    // Первый запуск - определяем кто это
+                    // ВАЖНО: При первом запуске на каждом компьютере,
+                    // нужно заменить значения ниже на реальные отпечатки
+                    
+                    // Для теста: первый компьютер будет Vitalik, второй - Ciba
+                    if (!localStorage.getItem('chat_user')) {
+                        // Проверяем, есть ли уже пользователи в системе
+                        const snapshot = await database.ref('users').once('value');
+                        const users = snapshot.val() || {};
+                        
+                        if (!users.vitalik) {
+                            // Если Vitalik ещё нет, этот комп становится Vitalik
+                            localStorage.setItem('chat_user', 'vitalik');
+                            this.currentUser = 'vitalik';
+                            await database.ref('users/vitalik').set({
+                                fingerprint: this.userFingerprint,
+                                lastSeen: firebase.database.ServerValue.TIMESTAMP
+                            });
+                        } else if (!users.ciba) {
+                            // Если Vitalik уже есть, этот комп становится Ciba
+                            localStorage.setItem('chat_user', 'ciba');
+                            this.currentUser = 'ciba';
+                            await database.ref('users/ciba').set({
+                                fingerprint: this.userFingerprint,
+                                lastSeen: firebase.database.ServerValue.TIMESTAMP
+                            });
+                        } else {
+                            // Оба пользователя уже существуют - проверяем отпечатки
+                            const vitalikFp = users.vitalik.fingerprint;
+                            const cibaFp = users.ciba.fingerprint;
+                            
+                            if (this.userFingerprint === vitalikFp) {
+                                localStorage.setItem('chat_user', 'vitalik');
+                                this.currentUser = 'vitalik';
+                            } else if (this.userFingerprint === cibaFp) {
+                                localStorage.setItem('chat_user', 'ciba');
+                                this.currentUser = 'ciba';
+                            } else {
+                                this.showAccessDenied();
+                                return;
+                            }
+                        }
+                    }
+                    
+                    this.renderChat();
+                    
+                } catch (error) {
+                    console.error('Error identifying user:', error);
+                    this.showAccessDenied();
+                }
+            }
+
+            showAccessDenied() {
+                document.getElementById('app').innerHTML = `
+                    <div class="access-denied">
+                        <h1>🔒 Доступ запрещён</h1>
+                        <p>Этот чат только для Vitalik и Ciba.<br>У тебя нет доступа.</p>
+                        <p style="margin-top: 20px; font-size: 12px; color: #475569;">Fingerprint: ${this.userFingerprint}</p>
                     </div>
                 `;
+            }
+
+            renderChat() {
+                const isVitalik = this.currentUser === 'vitalik';
                 
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            });
-            
-            // Показываем кто онлайн
-            db.ref('.info/connected').on('value', (snap) => {
-                if (snap.val() && currentUser) {
-                    db.ref('users/' + currentUser).set({
-                        online: true,
-                        lastSeen: Date.now()
+                document.getElementById('app').innerHTML = `
+                    <div class="chat-container">
+                        <div class="chat-header">
+                            <div class="room-info">
+                                <span class="room-name">${isVitalik ? 'Vitalik' : 'Ciba'} · приват</span>
+                                <span class="room-badge">🔐 только для двоих</span>
+                            </div>
+                            <div class="users-status" id="usersStatus">
+                                <div class="user-status vitalik" id="statusVitalik">
+                                    <span class="user-dot online" id="dotVitalik"></span>
+                                    <span class="user-name">Vitalik</span>
+                                </div>
+                                <div class="user-status ciba" id="statusCiba">
+                                    <span class="user-dot online" id="dotCiba"></span>
+                                    <span class="user-name">Ciba</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="messages-area" id="messagesArea"></div>
+
+                        <div class="typing-indicator hidden" id="typingIndicator">
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <span id="typingText">печатает...</span>
+                        </div>
+
+                        <div class="input-area">
+                            <div class="input-wrapper">
+                                <textarea 
+                                    class="message-input" 
+                                    id="messageInput" 
+                                    placeholder="Сообщение..."
+                                    rows="1"
+                                ></textarea>
+                                <div class="input-actions">
+                                    <button class="action-btn" id="emojiBtn">😊</button>
+                                    <button class="action-btn" id="attachBtn">📎</button>
+                                    <button class="action-btn send" id="sendBtn">➤</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="emoji-picker hidden" id="emojiPicker"></div>
+
+                    <div class="modal" id="imageModal">
+                        <img src="" alt="" id="modalImage">
+                    </div>
+                `;
+
+                this.setupChatListeners();
+            }
+
+            setupChatListeners() {
+                const input = document.getElementById('messageInput');
+                const sendBtn = document.getElementById('sendBtn');
+                const attachBtn = document.getElementById('attachBtn');
+                const emojiBtn = document.getElementById('emojiBtn');
+                const picker = document.getElementById('emojiPicker');
+
+                // Отправка по Enter
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                // Авто-расширение и индикатор печатания
+                input.addEventListener('input', () => {
+                    input.style.height = 'auto';
+                    input.style.height = input.scrollHeight + 'px';
+                    
+                    // Отправляем статус "печатает"
+                    database.ref('typing/' + this.currentUser).set(true);
+                    clearTimeout(this.typingTimeout);
+                    this.typingTimeout = setTimeout(() => {
+                        database.ref('typing/' + this.currentUser).set(false);
+                    }, 2000);
+                });
+
+                sendBtn.addEventListener('click', () => this.sendMessage());
+
+                attachBtn.addEventListener('click', () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.sendMessage(null, e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    };
+                    input.click();
+                });
+
+                // Эмодзи
+                emojiBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    picker.classList.toggle('hidden');
+                });
+
+                picker.innerHTML = this.emojiList.map(emoji => 
+                    `<div class="emoji-item">${emoji}</div>`
+                ).join('');
+
+                picker.addEventListener('click', (e) => {
+                    const emoji = e.target.textContent;
+                    if (emoji && this.emojiList.includes(emoji)) {
+                        input.value += emoji;
+                        input.dispatchEvent(new Event('input'));
+                        picker.classList.add('hidden');
+                    }
+                });
+
+                document.addEventListener('click', () => {
+                    picker.classList.add('hidden');
+                });
+
+                // Drag & drop
+                document.body.addEventListener('dragover', (e) => e.preventDefault());
+                document.body.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.sendMessage(null, e.target.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            sendMessage(text = null, image = null) {
+                const input = document.getElementById('messageInput');
+                const messageText = text || input.value.trim();
+                
+                if (!messageText && !image) return;
+
+                const message = {
+                    id: Date.now().toString(),
+                    sender: this.currentUser,
+                    text: messageText || '',
+                    image: image,
+                    time: firebase.database.ServerValue.TIMESTAMP,
+                    read: false
+                };
+
+                database.ref('messages').push(message);
+                
+                if (!image) {
+                    input.value = '';
+                    input.style.height = 'auto';
+                }
+
+                // Убираем статус печатания
+                database.ref('typing/' + this.currentUser).set(false);
+            }
+
+            listenToMessages() {
+                database.ref('messages').on('child_added', (snapshot) => {
+                    const message = snapshot.val();
+                    message.id = snapshot.key;
+                    
+                    const messagesArea = document.getElementById('messagesArea');
+                    if (messagesArea) {
+                        messagesArea.appendChild(this.createMessageElement(message));
+                        messagesArea.scrollTop = messagesArea.scrollHeight;
+                    }
+                });
+            }
+
+            createMessageElement(message) {
+                const div = document.createElement('div');
+                div.className = `message ${message.sender}`;
+                
+                const time = new Date(message.time).toLocaleTimeString('ru-RU', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+
+                const senderName = message.sender === 'vitalik' ? 'Vitalik' : 'Ciba';
+                const avatar = message.sender === 'vitalik' ? 'V' : 'C';
+
+                div.innerHTML = `
+                    <div class="message-avatar">${avatar}</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">${senderName}</span>
+                            <span class="message-time">${time}</span>
+                        </div>
+                        <div class="message-bubble">
+                            ${message.image ? `<img src="${message.image}" class="message-image" onclick="chat.openImage('${message.image}')">` : ''}
+                            ${message.text ? message.text.replace(/\n/g, '<br>') : ''}
+                        </div>
+                    </div>
+                `;
+
+                return div;
+            }
+
+            listenToUsersStatus() {
+                // Слушаем статус Vitalik
+                database.ref('users/vitalik').on('value', (snapshot) => {
+                    const user = snapshot.val();
+                    if (user) {
+                        const dot = document.getElementById('dotVitalik');
+                        const isOnline = Date.now() - user.lastSeen < 10000;
+                        dot.className = `user-dot ${isOnline ? 'online' : 'offline'}`;
+                    }
+                });
+
+                // Слушаем статус Ciba
+                database.ref('users/ciba').on('value', (snapshot) => {
+                    const user = snapshot.val();
+                    if (user) {
+                        const dot = document.getElementById('dotCiba');
+                        const isOnline = Date.now() - user.lastSeen < 10000;
+                        dot.className = `user-dot ${isOnline ? 'online' : 'offline'}`;
+                    }
+                });
+
+                // Слушаем кто печатает
+                database.ref('typing').on('value', (snapshot) => {
+                    const typing = snapshot.val() || {};
+                    const indicator = document.getElementById('typingIndicator');
+                    const typingText = document.getElementById('typingText');
+                    
+                    const typingUsers = [];
+                    if (typing.vitalik && this.currentUser !== 'vitalik') typingUsers.push('Vitalik');
+                    if (typing.ciba && this.currentUser !== 'ciba') typingUsers.push('Ciba');
+                    
+                    if (typingUsers.length > 0) {
+                        indicator.classList.remove('hidden');
+                        typingText.textContent = typingUsers.join(' и ') + ' печатает...';
+                    } else {
+                        indicator.classList.add('hidden');
+                    }
+                });
+            }
+
+            updateUserStatus(online) {
+                if (this.currentUser) {
+                    database.ref('users/' + this.currentUser).update({
+                        lastSeen: online ? firebase.database.ServerValue.TIMESTAMP : Date.now() - 30000
                     });
                 }
-            });
+            }
+
+            openImage(src) {
+                const modal = document.getElementById('imageModal');
+                const img = document.getElementById('modalImage');
+                img.src = src;
+                modal.classList.add('active');
+                
+                modal.onclick = () => {
+                    modal.classList.remove('active');
+                };
+            }
+
+            setupEventListeners() {
+                // Обновляем статус каждые 5 секунд
+                setInterval(() => {
+                    this.updateUserStatus(true);
+                }, 5000);
+            }
+
+            setupEmojiPicker() {
+                // Уже в setupChatListeners
+            }
         }
 
-        // Проверяем, заходил ли уже
-        const savedUser = localStorage.getItem('chat_user');
-        if (savedUser === 'vitalik' || savedUser === 'ciba') {
-            selectUser(savedUser);
-        }
+        // Запускаем чат
+        const chat = new PrivateChat();
+        window.chat = chat; // Для доступа из onclick
     </script>
 </body>
 </html>
